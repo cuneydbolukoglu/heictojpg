@@ -8,7 +8,7 @@ import { faBolt } from "@fortawesome/free-solid-svg-icons";
 const { Header, Content } = Layout;
 const { Title } = Typography;
 
-const GlobalLayout = ({ children }) => {
+const GlobalLayout = ({ children, conversionData }) => {
     const {
         token: { colorBgContainer, borderRadiusLG },
     } = theme.useToken();
@@ -33,7 +33,7 @@ const GlobalLayout = ({ children }) => {
                         {children}
                     </Content>
                 </Layout>
-                <ConversionSummary />
+                <ConversionSummary conversionData={conversionData} />
             </Layout>
         </Layout>
     );

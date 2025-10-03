@@ -2,20 +2,29 @@
   "name": "heic2jpg",
   "version": "0.1.0",
   "private": true,
+  "main": "electron.js",
   "author": "Cüneyd Bölükoğlu",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron": "electron .",
+    "electron-dev": "NODE_ENV=development electron .",
+    "electron-build": "next build && electron-builder",
+    "electron-dist": "next build && electron-builder --publish=never",
+    "electron-pack": "next build && electron-builder --dir"
   },
   "dependencies": {
     "@fortawesome/free-brands-svg-icons": "^7.0.1",
     "@fortawesome/free-regular-svg-icons": "^7.0.1",
     "@fortawesome/free-solid-svg-icons": "^7.0.1",
     "@fortawesome/react-fontawesome": "^3.0.2",
+    "@img/sharp-libvips-darwin-x64": "^1.2.3",
     "antd": "^5.27.4",
     "axios": "^1.12.2",
+    "formidable": "^3.5.1",
+    "heic-convert": "^2.1.0",
     "next": "15.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -23,7 +32,66 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.5.3"
+  },
+  "build": {
+    "appId": "com.cuneyd.heic2jpg",
+    "productName": "HEIC2JPG Converter",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "electron.js",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "public/icon.icns",
+      "darkModeSupport": true,
+      "identity": null,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "HEIC2JPG Converter",
+      "icon": "public/icon.icns",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 200
+        },
+        {
+          "x": 410,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/icon.png"
+    }
   }
 }

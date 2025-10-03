@@ -1,5 +1,5 @@
 import React from "react";
-import { Layout, Button, Menu, theme } from "antd";
+import { Layout, Button, Menu, Divider } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faRightLeft,
@@ -104,16 +104,8 @@ export default function LeftSidebar({
             border: 0
           }}
         />
-
-        <div style={{ marginTop: "auto", height: '100%' }}>
-          <div
-            style={{
-              height: 54,
-              borderTop: "1px solid rgba(255,255,255,0.04)",
-              marginBottom: 12,
-              opacity: 0.7,
-            }}
-          />
+        <div style={{ marginTop: "auto"}}>
+          <Divider />
           <Button
             type="primary"
             size="large"

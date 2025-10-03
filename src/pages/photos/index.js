@@ -1,10 +1,9 @@
-// ConverterCenter.jsx (güncellenmiş)
 import React, { useMemo, useRef, useState } from "react";
-import {
-  Typography, Upload, Button, Row, Col, Card, Space, message, Image, Progress,
-} from "antd";
+import {  Typography, Upload, Button, Row, Col, Card, Space, message, Image, Progress } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloudArrowUp, faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faPlay, faImage, faFileImage, faDownload } from "@fortawesome/free-solid-svg-icons";
+import GlobalLayout from "../../components/layout";
+import { convertImage } from "../../utils/imageConverter";
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -13,25 +12,38 @@ export default function ConverterCenter() {
   const [items, setItems] = useState([]);
   const inputRef = useRef(null);
 
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   const addFiles = (fileList) => {
-    const newOnes = Array.from(fileList).map((file) => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      file,
-      origUrl: URL.createObjectURL(file),
-      convUrl: null,
-      status: "idle",
-      progress: 0,
-    }));
+    const newOnes = Array.from(fileList).map((file) => {
+      const isHeic = /\.(heic|heif)$/i.test(file.name);
+      return {
+        id: crypto.randomUUID(),
+        name: file.name,
+        file,
+        origUrl: isHeic ? null : URL.createObjectURL(file), // HEIC dosyaları için URL oluşturma
+        convUrl: null,
+        status: "idle",
+        progress: 0,
+        isHeic: isHeic, // HEIC dosyası mı diye işaretle
+      };
+    });
     setItems((prev) => [...prev, ...newOnes]);
   };
 
   const draggerProps = {
     multiple: true,
-    accept: ".heic,.HEIC",
+    accept: ".heic,.HEIC,.heif,.HEIF,.png,.PNG,.jpg,.JPG,.jpeg,.JPEG,.webp,.WEBP",
     beforeUpload: (file) => {
       addFiles([file]);
-      message.success(`${file.name} eklendi`);
+      const isHeic = /\.(heic|heif)$/i.test(file.name);
+      message.success(`${file.name} ${isHeic ? 'added (ready to convert)' : 'added'}`);
       return Upload.LIST_IGNORE;
     },
     showUploadList: false,
@@ -41,17 +53,15 @@ export default function ConverterCenter() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
 
   const callConvertApi = async (file, onBump) => {
-    const fd = new FormData();
-    fd.append("images", file);
-    const res = await fetch("/api/convert", { method: "POST", body: fd });
-    if (!res.ok) throw new Error("API error");
-    // küçük “sahte” ilerleme darbeleri
+    // Küçük "sahte" ilerleme darbeleri
     for (const p of [35, 60, 85]) {
       await new Promise((r) => setTimeout(r, 120));
       onBump?.(p);
     }
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
+    
+    // Client-side conversion kullan
+    const result = await convertImage(file);
+    return result.dataUrl;
   };
 
   const convertOne = async (id) => {
@@ -70,112 +80,198 @@ export default function ConverterCenter() {
     }
   };
 
-  // === Concurrency-limited Convert All ===
-  const convertAll = async (limit = 3) => {
-    const queue = items.filter((it) => it.status !== "done");
-    if (!queue.length) return;
-
-    let idx = 0;
-    const workers = new Array(Math.min(limit, queue.length)).fill(0).map(async () => {
-      while (idx < queue.length) {
-        const currentIndex = idx++;
-        const it = queue[currentIndex];
-        // bireysel dönüşümü çalıştır
-        await convertOne(it.id);
-      }
-    });
-
-    await Promise.all(workers);
-  };
-
   const previews = useMemo(
     () =>
       items.map((f) => (
         <Col xs={12} sm={8} md={6} key={f.id}>
-          <Card
-            hoverable
-            bordered={false}
-            bodyStyle={{ padding: 12 }}
-            style={{ borderRadius: 18, background: "#101826" }}
-            cover={
+          <div
+            style={{
+              position: "relative",
+              borderRadius: 16,
+              overflow: "hidden",
+              background: "#0e1722",
+              height: 200,
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.02)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            {f.convUrl ? (
+              // Dönüştürülmüş resim varsa göster
+              <Image
+                src={f.convUrl}
+                alt={f.name}
+                preview={{ mask: "Önizle" }}
+                style={{
+                  width: "100%", 
+                  height: "100%", 
+                  objectFit: "cover",
+                  opacity: f.status === "converting" ? 0.6 : 1, 
+                  transition: "opacity .2s",
+                }}
+              />
+            ) : f.origUrl ? (
+              // Orijinal resim varsa göster
+              <Image
+                src={f.origUrl}
+                alt={f.name}
+                preview={{ mask: "Önizle" }}
+                style={{
+                  width: "100%", 
+                  height: "100%", 
+                  objectFit: "cover",
+                  opacity: f.status === "converting" ? 0.6 : 1, 
+                  transition: "opacity .2s",
+                }}
+              />
+            ) : (
+              // HEIC dosyası için icon göster
               <div
                 style={{
-                  borderRadius: 16, overflow: "hidden", margin: 12, background: "#0e1722",
-                  height: 160, display: "flex", alignItems: "center", justifyContent: "center",
-                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#4dabff",
+                  height: "100%",
                 }}
               >
-                <Image
-                  src={f.convUrl ?? f.origUrl}
-                  alt={f.name}
-                  preview={{ mask: "Önizle" }}
-                  style={{
-                    width: "100%", height: "100%", objectFit: "cover",
-                    opacity: f.status === "converting" ? 0.6 : 1, transition: "opacity .2s",
-                  }}
+                <FontAwesomeIcon 
+                  icon={f.isHeic ? faFileImage : faImage} 
+                  style={{ fontSize: 48, marginBottom: 8, opacity: 0.8 }} 
                 />
-                {f.status === "converting" && (
-                  <div
-                    style={{
-                      position: "absolute", inset: 0, display: "flex",
-                      alignItems: "center", justifyContent: "center",
-                      backdropFilter: "blur(1px)",
+                <Text style={{ color: "#aab8c2", fontSize: 12, textAlign: "center" }}>
+                  {f.isHeic ? "HEIC File" : "Image File"}
+                </Text>
+              </div>
+            )}
+
+            {/* Converting Progress Overlay */}
+            {f.status === "converting" && (
+              <div
+                style={{
+                  position: "absolute", 
+                  inset: 0, 
+                  display: "flex",
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  backdropFilter: "blur(1px)",
+                  background: "rgba(0,0,0,0.5)",
+                }}
+              >
+                <Progress type="circle" percent={f.progress} size={64} strokeColor="#4dabff" />
+              </div>
+            )}
+
+            {/* Bottom Overlay - Sadece dönüştürülmüş dosyalar için */}
+            {f.convUrl && f.status === "done" && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+                  padding: "12px 16px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                {/* Sol taraf - Dosya adı ve indirme ikonu */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <Text 
+                    style={{ 
+                      color: "#fff", 
+                      fontSize: 12, 
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1
                     }}
                   >
-                    <Progress type="circle" percent={f.progress} size={64} strokeColor="#4dabff" />
-                  </div>
-                )}
-              </div>
-            }
-            actions={[
-              <Button
-                key="convert"
-                type={f.status === "done" ? "default" : "primary"}
-                onClick={() => convertOne(f.id)}
-                disabled={f.status === "converting"}
-              >
-                {f.status === "done" ? "Reconvert" : "Convert"}
-              </Button>,
-              f.convUrl ? (
-                <Button
-                  key="download"
-                  onClick={() => {
-                    const a = document.createElement("a");
-                    a.href = f.convUrl;
-                    a.download = f.name.replace(/\.(heic)$/i, ".jpg");
-                    a.click();
+                    {f.name.replace(/\.(heic|heif)$/i, ".jpg")}
+                  </Text>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<FontAwesomeIcon icon={faDownload} style={{ color: "#4dabff" }} />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const a = document.createElement("a");
+                      a.href = f.convUrl;
+                      a.download = f.name.replace(/\.(heic|heif)$/i, ".jpg");
+                      a.click();
+                    }}
+                    style={{ 
+                      padding: "4px 8px",
+                      height: "auto",
+                      minWidth: "auto"
+                    }}
+                  />
+                </div>
+
+                {/* Sağ taraf - Dosya boyutu */}
+                <Text 
+                  style={{ 
+                    color: "#aab8c2", 
+                    fontSize: 11,
+                    fontWeight: 500,
+                    marginLeft: 8
                   }}
                 >
-                  Download
+                  {formatFileSize(f.file?.size || 0)}
+                </Text>
+              </div>
+            )}
+
+            {/* Convert Button - Sadece dönüştürülmemiş dosyalar için */}
+            {!f.convUrl && f.status !== "converting" && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                }}
+              >
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    convertOne(f.id);
+                  }}
+                  style={{
+                    background: "#4dabff",
+                    border: "none",
+                    borderRadius: 8,
+                    fontWeight: 500,
+                  }}
+                >
+                  Convert
                 </Button>
-              ) : (
-                <span key="sp" />
-              ),
-            ]}
-          >
-            <Space direction="vertical" size={2} style={{ width: "100%" }}>
-              <Text style={{ opacity: 0.85, fontSize: 12 }}>{f.name}</Text>
-              <Text type={f.status === "error" ? "danger" : "secondary"} style={{ fontSize: 12 }}>
-                {f.status === "idle" && "Ready"}
-                {f.status === "converting" && "Converting…"}
-                {f.status === "done" && "Converted"}
-                {f.status === "error" && "Error"}
-              </Text>
-            </Space>
-          </Card>
+              </div>
+            )}
+          </div>
         </Col>
       )),
-    [items]
+    [items, formatFileSize]
   );
 
   return (
-    <>
+    <GlobalLayout conversionData={{ items, convertAll: () => convertAll(3) }}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <Title level={1} style={{ margin: 0, fontSize: 48, lineHeight: 1.1 }}>
-          Convert HEIC to JPG with Ease
+          Convert HEIC to JPG
         </Title>
         <Text style={{ opacity: 0.8, fontSize: 18 }}>
-          Drag and drop your HEIC files, or browse to upload. We&apos;ll handle the rest.
+          Drag and drop your HEIC files, or browse to upload. We&apos;ll convert them to JPG.
         </Text>
       </div>
 
@@ -189,24 +285,10 @@ export default function ConverterCenter() {
             height: 250,
           }}
         >
-          <Space direction="vertical" align="center" style={{ width: "100%" }}>
+          <Space direction="vertical" align="center" style={{ width: "100%", height: 200, justifyContent: "center" }}>
             <FontAwesomeIcon icon={faCloudArrowUp} style={{ fontSize: 42, opacity: 0.9 }} />
             <Title level={4} style={{ margin: 0 }}>Drag and drop files here</Title>
-            <Text style={{ opacity: 0.75 }}>or</Text>
-            <Button type="primary" size="large" onClick={() => inputRef.current?.click()}>
-              Browse Files
-            </Button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".heic,.HEIC"
-              multiple
-              hidden
-              onChange={(e) => addFiles(e.target.files)}
-            />
-            <Button icon={<FontAwesomeIcon icon={faPlay} />} onClick={() => convertAll(3)}>
-              Convert All (x3)
-            </Button>
+            <Text style={{ opacity: 0.75 }}>Max 200 photos</Text>
           </Space>
         </Dragger>
 
@@ -215,6 +297,6 @@ export default function ConverterCenter() {
           <Row gutter={[16, 16]}>{previews}</Row>
         </div>
       </Space>
-    </>
+    </GlobalLayout>
   );
 }
