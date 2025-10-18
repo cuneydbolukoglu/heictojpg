@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {  Typography, Upload, Button, Row, Col, Card, Space, message, Image, Progress } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloudArrowUp, faPlay, faImage, faFileImage, faDownload } from "@fortawesome/free-solid-svg-icons";
@@ -10,7 +10,42 @@ const { Dragger } = Upload;
 
 export default function ConverterCenter() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
+
+  // AirDrop dosyalarını dinle
+  useEffect(() => {
+    const handleAirDropFile = (event, fileData) => {
+      console.log('AirDrop file received:', fileData);
+      message.success(`AirDrop dosyası algılandı: ${fileData.name}`);
+      
+      // Dosyayı otomatik olarak ekle
+      const newItem = {
+        id: crypto.randomUUID(),
+        name: fileData.name,
+        file: null, // Electron'dan gelen dosya
+        origUrl: null,
+        convUrl: null,
+        status: "idle",
+        progress: 0,
+        isHeic: /\.(heic|heif)$/i.test(fileData.name),
+        airDropPath: fileData.path
+      };
+      
+      setItems(prev => [...prev, newItem]);
+    };
+
+    // Electron IPC listener'ı ekle
+    if (window.electronAPI) {
+      window.electronAPI.onAirDropFile(handleAirDropFile);
+    }
+
+    return () => {
+      if (window.electronAPI) {
+        window.electronAPI.removeAirDropListener(handleAirDropFile);
+      }
+    };
+  }, []);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 B';
@@ -59,24 +94,70 @@ export default function ConverterCenter() {
       onBump?.(p);
     }
     
-    // Client-side conversion kullan
-    const result = await convertImage(file);
-    return result.dataUrl;
+    // Server-side API kullan
+    const formData = new FormData();
+    formData.append('images', file);
+    
+    const response = await fetch('/api/convert', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.results[0].dataUrl;
   };
 
   const convertOne = async (id) => {
     const item = items.find((x) => x.id === id);
     if (!item || item.status === "converting") return;
 
+    console.log("Starting conversion for item:", item.name);
+    setLoading(true);
     setStatus(id, { status: "converting", progress: 10 });
     try {
+      console.log("Calling convert API...");
       const url = await callConvertApi(item.file, (p) => setStatus(id, { progress: p }));
+      console.log("Conversion successful, URL:", url ? "Generated" : "Failed");
       setStatus(id, { convUrl: url, status: "done", progress: 100 });
       message.success(`${item.name} dönüştürüldü`);
     } catch (e) {
-      console.error(e);
+      console.error("Conversion error:", e);
       setStatus(id, { status: "error", progress: 0 });
-      message.error(`${item?.name ?? "Dosya"} dönüştürülemedi`);
+      
+      if (e.message.includes("HEIC format not supported")) {
+        message.error("HEIC dosyaları desktop uygulamada desteklenmiyor. Lütfen PNG veya WebP dosyaları kullanın.");
+      } else {
+        message.error(`${item?.name ?? "Dosya"} dönüştürülemedi: ${e.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // === Concurrency-limited Convert All ===
+  const convertAll = async (limit = 3) => {
+    const queue = items.filter((it) => it.status !== "done");
+    if (!queue.length) return;
+
+    setLoading(true);
+    try {
+      let idx = 0;
+      const workers = new Array(Math.min(limit, queue.length)).fill(0).map(async () => {
+        while (idx < queue.length) {
+          const currentIndex = idx++;
+          const it = queue[currentIndex];
+          // bireysel dönüşümü çalıştır
+          await convertOne(it.id);
+        }
+      });
+
+      await Promise.all(workers);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -261,11 +342,11 @@ export default function ConverterCenter() {
           </div>
         </Col>
       )),
-    [items, formatFileSize]
+    [items, convertOne, formatFileSize]
   );
 
   return (
-    <GlobalLayout conversionData={{ items, convertAll: () => convertAll(3) }}>
+    <GlobalLayout conversionData={{ items, convertAll: () => convertAll(3) }} loading={loading}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <Title level={1} style={{ margin: 0, fontSize: 48, lineHeight: 1.1 }}>
           Convert HEIC to JPG

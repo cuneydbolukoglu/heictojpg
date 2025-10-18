@@ -1,6 +1,51 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const chokidar = require('chokidar');
 const isDev = process.env.NODE_ENV === 'development';
+
+let mainWindow;
+let fileWatcher;
+
+// AirDrop dosyalarını izle
+function watchAirDropFiles() {
+  const airDropPath = path.join(process.env.HOME, 'Downloads');
+  
+  console.log('Watching AirDrop files in:', airDropPath);
+  
+  fileWatcher = chokidar.watch(airDropPath, {
+    ignored: /(^|[\/\\])\../, // ignore dotfiles
+    persistent: true,
+    ignoreInitial: true
+  });
+
+  fileWatcher.on('add', (filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    if (['.heic', '.heif'].includes(ext)) {
+      console.log('HEIC file detected:', filePath);
+      
+      // Web sayfasına dosya bilgisini gönder
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('airdrop-file', {
+          path: filePath,
+          name: path.basename(filePath),
+          size: fs.statSync(filePath).size
+        });
+      }
+    }
+  });
+}
+
+// IPC handlers
+ipcMain.handle('convert-file', async (event, filePath) => {
+  try {
+    // Burada dosyayı dönüştürme işlemi yapılabilir
+    // Şimdilik sadece dosya yolunu döndürüyoruz
+    return { success: true, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
 let mainWindow;
 
@@ -15,7 +60,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: true
+      webSecurity: false,
+      allowRunningInsecureContent: true
     },
     icon: path.join(__dirname, 'public/icon.png'), // Uygulama ikonu
     titleBarStyle: 'hiddenInset', // Mac için native görünüm
@@ -36,8 +82,9 @@ function createWindow() {
   // Next.js uygulamasını yükle
   const startUrl = isDev 
     ? 'http://localhost:3001' 
-    : `file://${path.join(__dirname, '../out/index.html')}`;
+    : `file://${path.join(__dirname, 'out/index.html')}`;
   
+  console.log('Loading URL:', startUrl);
   mainWindow.loadURL(startUrl);
 
   // Pencere kapatıldığında
@@ -55,6 +102,9 @@ function createWindow() {
 // Uygulama hazır olduğunda pencereyi oluştur
 app.whenReady().then(() => {
   createWindow();
+  
+  // AirDrop dosyalarını izlemeye başla
+  watchAirDropFiles();
 
   // Mac'te dock icon'a tıklandığında pencereyi göster
   app.on('activate', () => {
@@ -126,3 +176,4 @@ if (process.platform === 'darwin') {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
+

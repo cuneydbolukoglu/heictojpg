@@ -104,23 +104,6 @@ export default function LeftSidebar({
             border: 0
           }}
         />
-        <div style={{ marginTop: "auto"}}>
-          <Divider />
-          <Button
-            type="primary"
-            size="large"
-            icon={<FontAwesomeIcon icon={faDownload} />}
-            block
-            style={{
-              background: "#4dabff",
-              borderRadius: 14,
-              fontWeight: 700,
-              height: 44,
-            }}
-          >
-            Download App
-          </Button>
-        </div>
       </Sider>
   );
 }
