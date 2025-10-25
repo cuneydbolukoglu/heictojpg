@@ -346,7 +346,7 @@ export default function ConverterCenter() {
   );
 
   return (
-    <GlobalLayout conversionData={{ items, convertAll: () => convertAll(3) }} loading={loading}>
+    <div conversionData={{ items, convertAll: () => convertAll(3) }} loading={loading}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <Title level={1} style={{ margin: 0, fontSize: 48, lineHeight: 1.1 }}>
           Convert HEIC to JPG
@@ -378,6 +378,6 @@ export default function ConverterCenter() {
           <Row gutter={[16, 16]}>{previews}</Row>
         </div>
       </Space>
-    </GlobalLayout>
+    </div>
   );
 }

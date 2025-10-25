@@ -3,7 +3,7 @@ import { Layout, theme, Typography, Spin } from "antd";
 import Sidebar from "../leftSidebar";
 import ConversionSummary from "../rightSideBar";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBolt } from "@fortawesome/free-solid-svg-icons";
+import { faBolt, faImage } from "@fortawesome/free-solid-svg-icons";
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -24,12 +24,11 @@ const GlobalLayout = ({ children, conversionData, loading = false }) => {
                 height: '64px',
             }} >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FontAwesomeIcon icon={faBolt} style={{ fontSize: '24px', color: '#4dabff' }} />
-                    <Title level={2} style={{ margin: 0, color: '#fff' }}>HEIC 2 JPG</Title>
+                    <FontAwesomeIcon icon={faImage} style={{ fontSize: '24px' }} />
+                    <Title level={2} style={{ margin: 0, color: '#fff' }}>HEIC to JPG</Title>
                 </div>
             </Header>
             <Layout>
-                <Sidebar />
                 <Layout>
                     <Content
                         style={{

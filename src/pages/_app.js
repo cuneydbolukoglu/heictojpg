@@ -1,4 +1,5 @@
 import Head from "next/head";
+import GlobalLayout from "@/components/layout";
 import "@/styles/globals.css";
 import { ConfigProvider, theme } from "antd";
 
@@ -28,7 +29,9 @@ export default function App({ Component, pageProps }) {
         },
       }}
     >
-      <Component {...pageProps} />
+      <GlobalLayout>
+        <Component {...pageProps} />
+      </GlobalLayout>
     </ConfigProvider>
   </>;
 }

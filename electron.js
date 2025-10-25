@@ -4,6 +4,8 @@ const fs = require('fs');
 const chokidar = require('chokidar');
 const isDev = process.env.NODE_ENV === 'development';
 
+app.setName('heictojpg Converter');
+
 let mainWindow;
 let fileWatcher;
 
@@ -14,23 +16,31 @@ function watchAirDropFiles() {
   console.log('Watching AirDrop files in:', airDropPath);
   
   fileWatcher = chokidar.watch(airDropPath, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
+    ignored: /(^|[\/\\])\../,
     persistent: true,
     ignoreInitial: true
   });
 
-  fileWatcher.on('add', (filePath) => {
+  fileWatcher.on('add', async (filePath) => {
     const ext = path.extname(filePath).toLowerCase();
     if (['.heic', '.heif'].includes(ext)) {
-      console.log('HEIC file detected:', filePath);
+      console.log('HEIC file detected via AirDrop:', filePath);
       
-      // Web sayfasına dosya bilgisini gönder
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('airdrop-file', {
+      try {
+        const stats = fs.statSync(filePath);
+        const fileData = {
           path: filePath,
           name: path.basename(filePath),
-          size: fs.statSync(filePath).size
-        });
+          size: stats.size,
+          type: 'airdrop'
+        };
+        
+        // Web sayfasına dosya bilgisini gönder
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('airdrop-file', fileData);
+        }
+      } catch (error) {
+        console.error('Error reading AirDrop file:', error);
       }
     }
   });
@@ -39,18 +49,50 @@ function watchAirDropFiles() {
 // IPC handlers
 ipcMain.handle('convert-file', async (event, filePath) => {
   try {
-    // Burada dosyayı dönüştürme işlemi yapılabilir
-    // Şimdilik sadece dosya yolunu döndürüyoruz
-    return { success: true, path: filePath };
+    console.log(`Converting file: ${filePath}`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return { success: true, path: filePath, output: 'output/path/simulated.jpg' };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-let mainWindow;
+// Yeni: Dosyayı Photos.js'e aktar
+ipcMain.handle('import-to-photos', async (event, filePath) => {
+  try {
+    // Burada dosyayı Photos uygulamasına aktarma işlemi yapılacak
+    console.log(`Importing to Photos: ${filePath}`);
+    
+    // Şimdilik dosyayı kopyalayarak simüle edelim
+    const photosImportPath = path.join(process.env.HOME, 'Pictures', 'Imported Photos', path.basename(filePath));
+    
+    // Klasörü oluştur
+    const dir = path.dirname(photosImportPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // Dosyayı kopyala
+    fs.copyFileSync(filePath, photosImportPath);
+    
+    return { success: true, importedPath: photosImportPath };
+  } catch (error) {
+    console.error('Import error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Yeni: Dosya okuma handler'ı
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    return { success: true, buffer: buffer };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
 function createWindow() {
-  // Ana pencereyi oluştur
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -61,25 +103,22 @@ function createWindow() {
       contextIsolation: true,
       enableRemoteModule: false,
       webSecurity: false,
-      allowRunningInsecureContent: true
+      allowRunningInsecureContent: true,
+      preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, 'public/icon.png'), // Uygulama ikonu
-    titleBarStyle: 'hiddenInset', // Mac için native görünüm
-    show: false, // Pencere hazır olana kadar gizle
-    backgroundColor: '#0f1923' // Dark theme background
+    icon: path.join(__dirname, 'public/icon.png'),
+    titleBarStyle: 'hiddenInset',
+    show: false,
+    backgroundColor: '#0f1923'
   });
 
-  // Pencere hazır olduğunda göster
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
-    // Development modunda DevTools'u aç
     if (isDev) {
       mainWindow.webContents.openDevTools();
     }
   });
 
-  // Next.js uygulamasını yükle
   const startUrl = isDev 
     ? 'http://localhost:3001' 
     : `file://${path.join(__dirname, 'out/index.html')}`;
@@ -87,26 +126,20 @@ function createWindow() {
   console.log('Loading URL:', startUrl);
   mainWindow.loadURL(startUrl);
 
-  // Pencere kapatıldığında
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
-  // External linkleri default browser'da aç
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 }
 
-// Uygulama hazır olduğunda pencereyi oluştur
 app.whenReady().then(() => {
   createWindow();
-  
-  // AirDrop dosyalarını izlemeye başla
   watchAirDropFiles();
 
-  // Mac'te dock icon'a tıklandığında pencereyi göster
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -114,18 +147,16 @@ app.whenReady().then(() => {
   });
 });
 
-// Tüm pencereler kapatıldığında uygulamayı kapat (Mac hariç)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// Mac menüsünü oluştur
 if (process.platform === 'darwin') {
   const template = [
     {
-      label: 'HEIC2JPG',
+      label: 'heictojpg Converter',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
@@ -176,4 +207,3 @@ if (process.platform === 'darwin') {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
-

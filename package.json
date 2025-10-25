@@ -1,5 +1,5 @@
 {
-  "name": "heic2jpg",
+  "name": "heictojpg",
   "version": "0.1.0",
   "private": true,
   "main": "electron.js",
@@ -39,10 +39,10 @@
     "eslint-config-next": "15.5.3"
   },
   "build": {
-    "appId": "com.cuneyd.heic2jpg",
-    "productName": "HEIC2JPG Converter",
+    "appId": "com.cuneyd.heictojpg",
+    "productName": "heictojpg Converter",
     "directories": {
-      "output": "dist"
+      "output": "mac"
     },
     "files": [
       "out/**/*",
@@ -73,7 +73,7 @@
       "gatekeeperAssess": false
     },
     "dmg": {
-      "title": "HEIC2JPG Converter",
+      "title": "heictojpg Converter",
       "icon": "public/icon.icns",
       "window": {
         "width": 540,

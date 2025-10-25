@@ -1,11 +1,10 @@
 import React from "react";
-import { Layout, Button, Menu, Divider } from "antd";
+import { Layout, Menu } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faRightLeft,
   faClockRotateLeft,
   faGear,
-  faDownload,
 } from "@fortawesome/free-solid-svg-icons";
 
 const { Sider } = Layout;

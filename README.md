@@ -1,2 +1,2 @@
-# heic2jpg
+# heictojpg
 
