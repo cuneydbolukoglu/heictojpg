@@ -15,7 +15,7 @@ export default function App({ Component, pageProps }) {
     </Head>
     <ConfigProvider
       theme={{
-        algorithm:  darkAlgorithm, // Dark mode için
+        // algorithm:  darkAlgorithm, // Dark mode için
         token: {
           // colorBgContainer: '#0f1923',
         },
@@ -24,7 +24,8 @@ export default function App({ Component, pageProps }) {
             // colorBgContainer: '#10162a',
           },
           Layout: {
-            colorBgContainer: '#10162a',
+            // colorBgContainer: '#10162a',
+            headerBg: '#fff'
           }
         },
       }}
