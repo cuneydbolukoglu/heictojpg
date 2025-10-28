@@ -1,104 +1,70 @@
 {
   "name": "heictojpg",
-  "version": "0.1.0",
-  "private": true,
-  "main": "electron.js",
+  "version": "0.1.1",
+  "description": "HEIC to JPG Converter",
   "author": "Cüneyd Bölükoğlu",
+  "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "eslint",
-    "electron": "electron .",
-    "electron-dev": "NODE_ENV=development electron .",
-    "electron-build": "next build && electron-builder",
-    "electron-dist": "next build && electron-builder --publish=never",
-    "electron-pack": "next build && electron-builder --dir"
-  },
-  "dependencies": {
-    "@fortawesome/free-brands-svg-icons": "^7.0.1",
-    "@fortawesome/free-regular-svg-icons": "^7.0.1",
-    "@fortawesome/free-solid-svg-icons": "^7.0.1",
-    "@fortawesome/react-fontawesome": "^3.0.2",
-    "@img/sharp-libvips-darwin-x64": "^1.2.3",
-    "antd": "^5.27.4",
-    "axios": "^1.12.2",
-    "chokidar": "^4.0.3",
-    "formidable": "^3.5.1",
-    "heic-convert": "^2.1.0",
-    "next": "15.5.3",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "sharp": "^0.34.4"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "electron": "^38.1.2",
-    "electron-builder": "^26.0.12",
-    "eslint": "^9",
-    "eslint-config-next": "15.5.3"
+    "dev": "next dev",
+    "build": "next build && next export",
+    "electron": "electron electron/main.js",
+    "electron-dev": "electron electron/main.js",
+    "build-electron": "npm run build && npm run electron",
+    "dev-full": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\"",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:dmg": "npm run build && electron-builder --mac dmg",
+    "dist:dir": "npm run build && electron-builder --dir",
+    "pack": "npm run build && electron-builder --dir"
   },
   "build": {
     "appId": "com.cuneyd.heictojpg",
-    "productName": "heictojpg Converter",
+    "productName": "HEIC to JPG Converter",
     "directories": {
-      "output": "mac"
+      "output": "dist"
     },
     "files": [
+      "electron/**/*",
       "out/**/*",
-      "electron.js",
-      "node_modules/**/*"
+      "package.json"
     ],
     "mac": {
       "category": "public.app-category.graphics-design",
+      "icon": "electron/assets/icon.icns",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
-      "icon": "public/icon.icns",
-      "darkModeSupport": true,
-      "identity": null,
-      "gatekeeperAssess": false
+      "darkModeSupport": true
     },
     "dmg": {
-      "title": "heictojpg Converter",
-      "icon": "public/icon.icns",
+      "background": "electron/assets/dmg-background.png",
+      "iconSize": 128,
+      "contents": [
+        {
+          "x": 380,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 180,
+          "type": "file"
+        }
+      ],
       "window": {
         "width": 540,
         "height": 380
-      },
-      "contents": [
-        {
-          "x": 130,
-          "y": 200
-        },
-        {
-          "x": 410,
-          "y": 200,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
+      }
     },
-    "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "public/icon.png"
-    }
+    "compression": "maximum",
+    "forceCodeSigning": false
+  },
+  "devDependencies": {
+    "electron": "^latest",
+    "electron-builder": "^latest",
+    "concurrently": "^7.6.0",
+    "wait-on": "^7.0.1"
   }
 }
