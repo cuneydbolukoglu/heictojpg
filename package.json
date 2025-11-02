@@ -5,17 +5,30 @@
   "author": "Cüneyd Bölükoğlu",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"npm run dev:next\" \"sleep 5 && npm run electron\"",
+    "dev:next": "next dev",
     "build": "next build && next export",
     "electron": "electron electron/main.js",
     "electron-dev": "electron electron/main.js",
     "build-electron": "npm run build && npm run electron",
-    "dev-full": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\"",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:dmg": "npm run build && electron-builder --mac dmg",
     "dist:dir": "npm run build && electron-builder --dir",
     "pack": "npm run build && electron-builder --dir"
+  },
+  "dependencies": {
+    "antd": "^5.28.0",
+    "chokidar": "^4.0.3",
+    "heic2any": "^0.0.4",
+    "next": "^16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "electron": "^37.2.6",
+    "electron-builder": "^25.1.8"
   },
   "build": {
     "appId": "com.cuneyd.heictojpg",
@@ -60,11 +73,5 @@
     },
     "compression": "maximum",
     "forceCodeSigning": false
-  },
-  "devDependencies": {
-    "electron": "^latest",
-    "electron-builder": "^latest",
-    "concurrently": "^7.6.0",
-    "wait-on": "^7.0.1"
   }
 }

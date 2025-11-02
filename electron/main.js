@@ -1,7 +1,9 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, TouchBar, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
+
+const { TouchBarButton, TouchBarLabel, TouchBarSpacer } = TouchBar;
 
 // electron-is-dev olmadan development modu kontrolü
 const isDev = process.env.NODE_ENV === 'development' || 
@@ -12,6 +14,125 @@ app.setName('HEIC to JPG Converter');
 
 let mainWindow;
 let fileWatcher;
+
+// Touch Bar oluşturma
+function createTouchBar() {
+  const convertButton = new TouchBarButton({
+    label: '🔄 Dönüştür',
+    backgroundColor: '#007AFF',
+    click: () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('touchbar-convert');
+      }
+    }
+  });
+
+  const selectFileButton = new TouchBarButton({
+    label: '📁 Dosya Seç',
+    click: () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('touchbar-select-file');
+      }
+    }
+  });
+
+  return new TouchBar({
+    items: [
+      selectFileButton,
+      new TouchBarSpacer({ size: 'small' }),
+      convertButton,
+      new TouchBarSpacer({ size: 'large' }),
+      new TouchBarLabel({ label: 'HEIC to JPG' })
+    ]
+  });
+}
+
+// macOS menu template
+const template = [
+  {
+    label: 'HEIC to JPG Converter',
+    submenu: [
+      { 
+        label: 'HEIC to JPG Converter Hakkında',
+        click: async () => {
+          const { dialog } = require('electron');
+          await dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: 'Hakkında',
+            message: 'HEIC to JPG Converter',
+            detail: 'HEIC dosyalarınızı JPG formatına dönüştürün\nVersiyon 1.0.0'
+          });
+        }
+      },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' }
+    ]
+  },
+  {
+    label: 'Dosya',
+    submenu: [
+      { 
+        label: 'Dosya Aç...',
+        accelerator: 'Cmd+O',
+        click: async () => {
+          const { dialog } = require('electron');
+          const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openFile'],
+            filters: [
+              { name: 'Images', extensions: ['heic', 'heif'] }
+            ]
+          });
+          if (!result.canceled) {
+            mainWindow.webContents.send('file-opened', result.filePaths[0]);
+          }
+        }
+      },
+      { type: 'separator' },
+      { role: 'close', label: 'Pencereyi Kapat' }
+    ]
+  },
+  {
+    label: 'Düzen',
+    submenu: [
+      { role: 'undo', label: 'Geri Al' },
+      { role: 'redo', label: 'İleri Al' },
+      { type: 'separator' },
+      { role: 'cut', label: 'Kes' },
+      { role: 'copy', label: 'Kopyala' },
+      { role: 'paste', label: 'Yapıştır' },
+      { role: 'selectAll', label: 'Tümünü Seç' }
+    ]
+  },
+  {
+    label: 'Görünüm',
+    submenu: [
+      { role: 'reload', label: 'Yenile' },
+      { role: 'forceReload', label: 'Zorla Yenile' },
+      { role: 'toggleDevTools', label: 'Geliştirici Araçları' },
+      { type: 'separator' },
+      { role: 'resetZoom', label: 'Gerçek Boyut' },
+      { role: 'zoomIn', label: 'Yakınlaştır' },
+      { role: 'zoomOut', label: 'Uzaklaştır' },
+      { type: 'separator' },
+      { role: 'togglefullscreen', label: 'Tam Ekran' }
+    ]
+  },
+  {
+    label: 'Pencere',
+    submenu: [
+      { role: 'minimize', label: 'Küçült' },
+      { role: 'close', label: 'Kapat' },
+      { type: 'separator' },
+      { role: 'front', label: 'Öne Getir' }
+    ]
+  }
+];
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -27,13 +148,19 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, 'assets/icon.png'),
-    titleBarStyle: 'hiddenInset',
+    // titleBarStyle: 'hiddenInset',
     show: false,
     backgroundColor: '#1a1a1a'
   });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    
+    // Touch Bar'ı burada ayarla - BURASI ÖNEMLİ!
+    if (process.platform === 'darwin') {
+      mainWindow.setTouchBar(createTouchBar());
+    }
+    
     if (isDev) {
       mainWindow.webContents.openDevTools();
     }
@@ -81,161 +208,18 @@ function createWindow() {
   });
 }
 
-function showErrorPage(message) {
-  const errorHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>HEIC to JPG Converter</title>
-        <style>
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            text-align: center;
-          }
-          .container {
-            background: rgba(255,255,255,0.1);
-            padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-            max-width: 500px;
-          }
-          h1 { margin-bottom: 20px; }
-          .error-message {
-            background: rgba(255,0,0,0.2);
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border: 1px solid rgba(255,0,0,0.3);
-          }
-          code {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 5px;
-            display: block;
-            margin: 10px 0;
-            font-family: 'Monaco', 'Menlo', monospace;
-          }
-          button {
-            background: #1890ff;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            margin: 5px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>HEIC to JPG Converter</h1>
-          <div class="error-message">
-            <strong>Error:</strong> ${message}
-          </div>
-          <p>Çözüm için:</p>
-          <code>npm run dev</code>
-          <p>veya</p>
-          <code>npm run build</code>
-          <div style="margin-top: 20px;">
-            <button onclick="location.reload()">Tekrar Dene</button>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
-}
-
-// AirDrop dosya izleme
-function watchAirDropFiles() {
-  const downloadsPath = path.join(process.env.HOME, 'Downloads');
-  
-  if (!fs.existsSync(downloadsPath)) {
-    console.log('Downloads directory not found');
-    return;
-  }
-  
-  console.log('📁 Watching files in:', downloadsPath);
-  
-  fileWatcher = chokidar.watch(downloadsPath, {
-    ignored: /(^|[\/\\])\../,
-    persistent: true,
-    ignoreInitial: true
-  });
-
-  fileWatcher.on('add', (filePath) => {
-    const ext = path.extname(filePath).toLowerCase();
-    if (['.heic', '.heif'].includes(ext)) {
-      console.log('📸 HEIC file detected:', filePath);
-      
-      try {
-        const stats = fs.statSync(filePath);
-        const fileData = {
-          path: filePath,
-          name: path.basename(filePath),
-          size: stats.size,
-          type: 'airdrop'
-        };
-        
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('airdrop-file', fileData);
-        }
-      } catch (error) {
-        console.error('Error reading file:', error);
-      }
-    }
-  });
-}
-
-// IPC Handlers
-ipcMain.handle('convert-file', async (event, filePath) => {
-  try {
-    console.log('Converting file:', filePath);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return { success: true, path: filePath };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('import-to-photos', async (event, filePath) => {
-  try {
-    const picturesPath = path.join(process.env.HOME, 'Pictures');
-    const importPath = path.join(picturesPath, 'Converted Images', path.basename(filePath));
-    
-    const dir = path.dirname(importPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    fs.copyFileSync(filePath, importPath);
-    return { success: true, path: importPath };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('read-file', async (event, filePath) => {
-  try {
-    const buffer = fs.readFileSync(filePath);
-    return { success: true, buffer: buffer };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// ... (diğer fonksiyonlar aynı: showErrorPage, watchAirDropFiles, IPC handlers)
 
 // App event handlers
 app.whenReady().then(() => {
   console.log('🚀 Electron app starting...');
+  
+  // Menu'yu BURADA oluştur ve ayarla
+  if (process.platform === 'darwin') {
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+  }
+  
   createWindow();
   watchAirDropFiles();
 });
@@ -251,42 +235,3 @@ app.on('activate', () => {
     createWindow();
   }
 });
-
-// macOS menu
-if (process.platform === 'darwin') {
-  const template = [
-    {
-      label: 'HEIC to JPG Converter',
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' }
-      ]
-    }
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
-}

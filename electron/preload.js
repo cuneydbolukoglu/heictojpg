@@ -8,6 +8,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Events
   onAirdropFile: (callback) => ipcRenderer.on('airdrop-file', callback),
+  onFileOpened: (callback) => ipcRenderer.on('file-opened', callback),
+  
+  // Touch Bar events
+  onTouchBarConvert: (callback) => ipcRenderer.on('touchbar-convert', callback),
+  onTouchBarSelectFile: (callback) => ipcRenderer.on('touchbar-select-file', callback),
   
   // Remove listeners
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
