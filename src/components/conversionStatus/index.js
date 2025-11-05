@@ -1,4 +1,4 @@
-import { List, Button, Flex, Space, Typography, Progress, Image, Card, Spin } from "antd";
+import { List, Button, Flex, Space, Typography, Image, Card, Spin } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleXmark } from "@fortawesome/free-regular-svg-icons";
 import { faArrowRotateRight, faDownload } from "@fortawesome/free-solid-svg-icons";
@@ -38,13 +38,6 @@ export const ConversionStatus = ({ files, onReset, onDownloadAll }) => {
                                 : "Conversion Results"
                         }
                     </Text>
-                    {/* {!allComplete && (
-                        <Progress
-                            percent={Math.round((successCount / totalCount) * 100)}
-                            size="small"
-                            style={{ width: 200 }}
-                        />
-                    )} */}
                 </Space>
                 {allComplete && (
                     <Space>
